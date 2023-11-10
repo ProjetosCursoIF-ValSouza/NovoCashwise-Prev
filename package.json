@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "axios": "^1.5.1",
+    "bootstrap": "^5.3.2",
+    "cors": "^2.8.5",
+    "react-bootstrap": "^2.9.0"
+  },
+  "name": "cashwise-vs",
+  "description": "Nosso projeto para o PI3. Consiste em uma plataforma web que visa ensinar a educação financeira, e à ajudar no controle de gastos e um calculador de previdência. Tudo com um conteúdo mais leve, e com uma abordagem de \"gameficação\".",
+  "version": "1.0.0",
+  "main": "index.js",
+  "devDependencies": {},
+  "scripts": 
+  { "dev": "npm run dev"
+      }
+   
+}

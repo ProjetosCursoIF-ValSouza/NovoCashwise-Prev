@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model atualizacao_monetaria {
+  id      Int     @id @default(autoincrement()) @db.UnsignedInt
+  mes_ano String  @db.VarChar(7)
+  indice  Decimal @db.Decimal(10, 6)
+}
+
+model simulacao_beneficio {
+  id                          Int                          @id @default(autoincrement()) @db.UnsignedInt
+  genero                      simulacao_beneficio_genero
+  data_nascimento             DateTime                     @db.Date
+  idade                       Int?
+  tempo_contribuicao_mes      Int?
+  idade_aposentadoria         Int?
+  mes_aposentadoria           Int?
+  ano_aposentadoria           Int?
+  tempo_contribuicao_pendente Int?
+  salario_atualizado          Decimal                      @db.Decimal(10, 2)
+  valor_beneficio             Decimal?                     @db.Decimal(10, 2)
+  simulacao_periodo_trabalho  simulacao_periodo_trabalho[]
+}
+
+model simulacao_periodo_trabalho {
+  id                     Int                 @id @default(autoincrement()) @db.UnsignedInt
+  mes                    Int
+  ano                    Int
+  salario                Decimal             @db.Decimal(10, 2)
+  mes_ano                String              @db.VarChar(7)
+  simulacao_beneficio_id Int                 @db.UnsignedInt
+  simulacao_beneficio    simulacao_beneficio @relation(fields: [simulacao_beneficio_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_simulacao_periodo_trabalho_simulacao_beneficio")
+
+  @@index([simulacao_beneficio_id], map: "fk_simulacao_periodo_trabalho_simulacao_beneficio_idx")
+}
+
+enum simulacao_beneficio_genero {
+  m
+  f
+}
