@@ -1,0 +1,198 @@
+O dados das funções abaixo:
+
+// Função para calcular os requisitos de aposentadoria com base no gênero
+function calcularRequisitosAposentadoria(genero) {
+  if (genero === 'Masculino') {
+    return { periodoContribuicaoMinimo: 240, idadeAposentadoria: 65 };
+  } else if (genero === 'Feminino') {
+    return { periodoContribuicaoMinimo: 180, idadeAposentadoria: 62 };
+  } else {
+    // Retorne um objeto padrão se o gênero não for reconhecido
+    return { periodoContribuicaoMinimo: 0, idadeAposentadoria: 0 };
+  }
+}
+
+// Função para calcular o tempo de contribuição e pendente
+function calcularTempoContribuicao(arrCampoAnoMes, periodoContribuicaoMinimo) {
+  const tempoContribuicaoMes = arrCampoAnoMes.length;
+  const tempoContribuicaoPendente = Math.max(0, periodoContribuicaoMinimo - tempoContribuicaoMes);
+  return { tempoContribuicaoMes, tempoContribuicaoPendente };
+}
+
+
+// Função para calcular a idade com base na data de nascimento
+function calcularIdade(dataNascimento) {
+  const hoje = new Date();
+  const nascimento = new Date(dataNascimento);
+  let idade = hoje.getFullYear() - nascimento.getFullYear();
+  const mesAtual = hoje.getMonth();
+  const mesNascimento = nascimento.getMonth();
+  if (mesAtual < mesNascimento || (mesAtual === mesNascimento && hoje.getDate() < nascimento.getDate())) {
+    idade--;
+  }
+  return idade;
+}
+
+// Função para calcular o mês e ano da aposentadoria
+function calcularAposentadoria(idade, genero) {
+  const idadeAposentadoria = genero === 'Masculino' ? 65 : 62;
+  const hoje = new Date();
+  const anoAtual = hoje.getFullYear();
+  const mesAtual = hoje.getMonth() + 1;
+  let mesAposentadoria, anoAposentadoria;
+
+  if (mesAtual <= 6) {
+    mesAposentadoria = 7;
+    anoAposentadoria = anoAtual + idadeAposentadoria - idade;
+  } else {
+    mesAposentadoria = 7;
+    anoAposentadoria = anoAtual + idadeAposentadoria - idade + 1;
+  }
+
+  return {
+    mesAposentadoria,
+    anoAposentadoria
+  };
+}
+
+// Função para calcular o mês de aposentadoria com base na idade
+function calcularMesAposentadoria(dataNascimento, genero) {
+  const idade = calcularIdade(dataNascimento);
+  const { mesAposentadoria } = calcularAposentadoria(idade, genero);
+  return mesAposentadoria;
+}
+
+// Função para calcular o ano de aposentadoria
+function calcularAnoAposentadoria(dataNascimento, genero) {
+  const idade = calcularIdade(dataNascimento);
+  const { anoAposentadoria } = calcularAposentadoria(idade, genero);
+  return anoAposentadoria;
+}
+
+// Função para calcular a idade da aposentadoria
+function calcularIdadeAposentadoria(dataNascimento, genero) {
+  const hoje = new Date();
+  const idade = calcularIdade(dataNascimento);
+  const { anoAposentadoria } = calcularAposentadoria(idade, genero);
+  const dataAposentadoria = new Date(anoAposentadoria, 6 - 1); // 6 representa julho (7º mês)
+  const mesAposentadoria = (dataAposentadoria.getMonth() + 1 < 10 ? '0' : '') + (dataAposentadoria.getMonth() + 1);
+  
+  return {
+    idadeAposentadoria: idadeAposentadoria,
+      };
+}
+
+Não estão retornando o seguintes dados para o usuário/banco de dados:
+
+idadeAposentadoria, e
+ tempoContribuicaoPendente,,
+
+sendo que a rota posta está assim configurada:
+
+// Rota POST para processar os dados do formulário de simulação
+router.post('/', async (req, res) => {
+  try {
+    const { campoAnoMes, campoSalario, dataNascimento, genero } = req.body;
+
+    // Verifique se campoAnoMes e campoSalario estão definidos e não vazios
+    if (!campoAnoMes || !campoSalario || !Array.isArray(campoAnoMes) || !Array.isArray(campoSalario)) {
+      return res.status(400).json({ success: false, message: 'Dados ausentes ou inválidos' });
+    }
+
+    const idadeAtual = calcularIdade(dataNascimento);
+    const { periodoContribuicaoMinimo, idadeAposentadoria } = calcularRequisitosAposentadoria(genero);
+    const { tempoContribuicaoMes, tempoContribuicaoPendente } = calcularTempoContribuicao(campoAnoMes, periodoContribuicaoMinimo);
+
+    const mesAposentadoria = calcularMesAposentadoria(idadeAtual, idadeAposentadoria);
+    const anoAposentadoria = calcularAnoAposentadoria(idadeAtual, idadeAposentadoria);
+
+    // Inserir a simulação no banco de dados usando o Prisma
+    const simulacao = await prisma.simulacao_beneficio.create({
+      data: {
+        genero,
+        data_nascimento: new Date(dataNascimento),
+        idade: idadeAtual,
+        tempo_contribuicao_mes: tempoContribuicaoMes,
+        tempoContribuicaoPendente,
+        idade_aposentadoria: idadeAposentadoria,
+        mes_aposentadoria: mesAposentadoria,
+        anoAposentadoria,
+        valor_beneficio: NaN, // Defina o valor inicial como NaN
+        salario_atualizado: {
+          create: campoAnoMes.map((mesAno, index) => ({
+            mes_ano: mesAno,
+            salario_atualizado: 0, // Defina como 0, você pode ajustar conforme necessário
+          })),
+        },
+      },
+    });
+
+    // Após a criação da simulação, você pode obter o ID
+    const simulacaoId = simulacao.id;
+
+    // Calcular o salário atualizado e inserir na tabela salario_atualizado
+    const salariosAtualizados = await criarSalarioAtualizadoEntries(simulacaoId, campoAnoMes, campoSalario);
+
+console.log("salarioatualizado", salariosAtualizados)
+
+    // Inserir as entradas no banco de dados usando o Prisma
+    await prisma.salario_atualizado.createMany({
+      data: salariosAtualizados,
+    });
+
+    // Atualizar o valor do benefício no banco de dados (se for possível calcular)
+    const valorBeneficio = await calcularValorBeneficio(simulacaoId);
+
+    await prisma.simulacao_beneficio.update({
+      where: { id: simulacaoId },
+      data: { valor_beneficio: valorBeneficio },
+    });
+
+    // Criar um objeto 'result' com todas as informações
+    const result = {
+      success: true,
+      message: 'Simulação inserida com sucesso',
+      simulacao,
+      idSimulacao: simulacaoId,
+      idadeAtual,
+      periodoContribuicaoMinimo,
+      idadeAposentadoria,
+      tempoContribuicaoMes,
+      tempoContribuicaoPendente,
+      mesAposentadoria,
+      anoAposentadoria,
+      valorBeneficio: isNaN(valorBeneficio) ? 'Valor não apurado' : valorBeneficio,
+    };
+
+    // Retornar os resultados em formato JSON
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Erro ao processar a simulação', error: error.message });
+  }
+});, o que estaria dando errado?
+
+
+SUGESTÃO DO PHIND:
+
+ANSWER | PHIND V7 MODEL
+O problema parece estar na forma como você está chamando as funções para calcular mesAposentadoria e anoAposentadoria.
+
+Você está passando idadeAtual e idadeAposentadoria como argumentos para estas funções, mas essas funções esperam receber dataNascimento e genero como argumentos.
+
+const mesAposentadoria = calcularMesAposentadoria(idadeAtual, idadeAposentadoria);
+const anoAposentadoria = calcularAnoAposentadoria(idadeAtual, idadeAposentadoria);
+Isso provavelmente está causando um erro, pois idadeAposentadoria não é um valor booleano (Masculino ou Feminino), que é o que essas funções esperam como segundo argumento.
+
+Para corrigir isso, você deve passar dataNascimento e genero como argumentos para essas funções, assim:
+
+const mesAposentadoria = calcularMesAposentadoria(dataNascimento, genero);
+const anoAposentadoria = calcularAnoAposentadoria(dataNascimento, genero);
+Além disso, notei um erro na função calcularIdadeAposentadoria. Você está tentando retornar uma variável idadeAposentadoria que não foi definida em nenhum lugar na função. Talvez você quis retornar anoAposentadoria em vez disso:
+
+return {
+  idadeAposentadoria: anoAposentadoria,
+};
+Por fim, verifique se a rota está retornando corretamente os dados após a correção desses erros. Se ainda estiver enfrentando problemas, recomendo que você adicione mais declarações de log para depurar e identificar onde exatamente o problema está ocorrendo.
+
+
