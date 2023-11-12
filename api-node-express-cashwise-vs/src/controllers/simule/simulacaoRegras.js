@@ -1,11 +1,11 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import Big from 'big.js';
+
 const prisma = new PrismaClient();
 
 const router = express.Router();
 
-// Função para obter o índice de atualização monetária com base no mês e ano
 async function obterDadosAtualizacaoMonetaria(mesAno) {
   try {
     const parts = mesAno.split('/');
@@ -35,7 +35,6 @@ async function obterDadosAtualizacaoMonetaria(mesAno) {
   }
 }
 
-// Função para criar entradas para salario_atualizado
 async function criarSalarioAtualizadoEntries(simulacaoId, campoAnoMes, campoSalario) {
   try {
     const simulacao = await prisma.simulacao_beneficio.findUnique({
@@ -60,9 +59,9 @@ async function criarSalarioAtualizadoEntries(simulacaoId, campoAnoMes, campoSala
 
       return {
         mes_ano: mesAno,
-        salario_atualizado: salarioAtualizado,
+        salario_atualizado: parseFloat(salarioAtualizado),
         simulacao_beneficio_id: simulacaoId,
-      }
+      };
     }));
 
     return salarioAtualizadoEntries.filter(entry => entry !== null);
@@ -72,7 +71,6 @@ async function criarSalarioAtualizadoEntries(simulacaoId, campoAnoMes, campoSala
   }
 }
 
-// Função para calcular o valor de salário atualizado
 async function calcularSalarioAtualizado(simulacaoId, mesAno, arrCampoAnoMes, arrCampoSalario) {
   try {
     const simulacao = await prisma.simulacao_beneficio.findUnique({
@@ -100,7 +98,7 @@ async function calcularSalarioAtualizado(simulacaoId, mesAno, arrCampoAnoMes, ar
       await prisma.salario_atualizado.create({
         data: {
           mes_ano: mesAno,
-          salario_atualizado: salarioAtualizado,
+          salario_atualizado: parseFloat(salarioAtualizado),
           simulacao_beneficio: {
             connect: { id: simulacaoId },
           },
@@ -109,7 +107,7 @@ async function calcularSalarioAtualizado(simulacaoId, mesAno, arrCampoAnoMes, ar
 
       return {
         mes_ano: mesAno,
-        salario_atualizado: salarioAtualizado,
+        salario_atualizado: parseFloat(salarioAtualizado),
         simulacao_beneficio: {
           connect: { id: simulacaoId },
         },
@@ -135,7 +133,25 @@ async function calcularSalarioAtualizado(simulacaoId, mesAno, arrCampoAnoMes, ar
   }
 }
 
-// Função para calcular o mês e ano da aposentadoria
+function calcularIdade(dataNascimento) {
+  const hoje = new Date();
+  const nascimento = new Date(dataNascimento);
+  let idade = hoje.getFullYear() - nascimento.getFullYear();
+  const mesAtual = hoje.getMonth();
+  const mesNascimento = nascimento.getMonth();
+  if (mesAtual < mesNascimento || (mesAtual === mesNascimento && hoje.getDate() < nascimento.getDate())) {
+    idade--;
+  }
+  return idade;
+}
+
+function calcularRequisitosAposentadoria(genero) {
+  return {
+    Masculino: { periodoContribuicaoMinimo: 240, idadeAposentadoria: 65 },
+    Feminino: { periodoContribuicaoMinimo: 180, idadeAposentadoria: 62 },
+  }[genero] || { periodoContribuicaoMinimo: 0, idadeAposentadoria: 0 };
+}
+
 function calcularAposentadoria(idade, genero) {
   const idadeAposentadoria = genero === 'Masculino' ? 65 : 62;
   const hoje = new Date();
@@ -157,61 +173,25 @@ function calcularAposentadoria(idade, genero) {
   };
 }
 
-// Função para calcular o tempo de contribuição e pendente
-function calcularTempoContribuicao(arrCampoAnoMes, periodoContribuicaoMinimo) {
-  const tempoContribuicaoMes = arrCampoAnoMes.length;
-  const tempoContribuicaoPendente = Math.max(0, periodoContribuicaoMinimo - tempoContribuicaoMes);
-  return { tempoContribuicaoMes, tempoContribuicaoPendente };
-}
-
-// Função para calcular a idade com base na data de nascimento
-function calcularIdade(dataNascimento) {
-  const hoje = new Date();
-  const nascimento = new Date(dataNascimento);
-  let idade = hoje.getFullYear() - nascimento.getFullYear();
-  const mesAtual = hoje.getMonth();
-  const mesNascimento = nascimento.getMonth();
-  if (mesAtual < mesNascimento || (mesAtual === mesNascimento && hoje.getDate() < nascimento.getDate())) {
-    idade--;
-  }
-  return idade;
-}
-
-// Função para calcular o mês de aposentadoria com base na idade
 function calcularMesAposentadoria(dataNascimento, genero) {
   const { mesAposentadoria } = calcularAposentadoria(dataNascimento, genero);
   return mesAposentadoria;
 }
 
-// Função para calcular o ano de aposentadoria
 function calcularAnoAposentadoria(dataNascimento, genero) {
   const { anoAposentadoria } = calcularAposentadoria(dataNascimento, genero);
   return anoAposentadoria;
 }
 
-// Função para calcular a idade da aposentadoria
-function calcularIdadeAposentadoria(dataNascimento, genero) {
-  const hoje = new Date();
-  const { anoAposentadoria } = calcularAposentadoria(dataNascimento, genero);
-  const dataAposentadoria = new Date(anoAposentadoria, 6 - 1); // 6 representa julho (7º mês)
-  const mesAposentadoria = (dataAposentadoria.getMonth() + 1 < 10 ? '0' : '') + (dataAposentadoria.getMonth() + 1);
+function calcularTempoContribuicao(arrCampoAnoMes, periodoContribuicaoMinimo) {
+  const tempoContribuicaoMes = arrCampoAnoMes.length;
+  const tempoContribuicaoPendente = Math.max(0, periodoContribuicaoMinimo - tempoContribuicaoMes);
+
+  const result = { tempoContribuicaoMes, tempoContribuicaoPendente };
   
-  return {
-    idadeAposentadoria: anoAposentadoria,
-  };
+  return result;
 }
 
-// Função para calcular os requisitos de aposentadoria com base no gênero
-function calcularRequisitosAposentadoria(genero) {
-  const idadeAposentadoria = genero === 'Masculino' ? 65 : 62;
-  const periodoContribuicaoMinimo = 180; // Defina o período mínimo de contribuição necessário
-  return {
-    idadeAposentadoria,
-    periodoContribuicaoMinimo,
-  };
-}
-
-// Função para calcular o valor do benefício
 async function calcularValorBeneficio(simulacaoId) {
   try {
     const simulacaoBeneficio = await prisma.simulacao_beneficio.findUnique({
@@ -231,7 +211,13 @@ async function calcularValorBeneficio(simulacaoId) {
       throw new Error('Não há valores de salário atualizado para calcular o benefício');
     }
 
-    const somaSalariosAtualizados = salarioAtualizado.reduce((acc, salario) => acc.plus(new Big(salario.salario_atualizado)), new Big(0));
+    const salarioAtualizadoEntries = salarioAtualizado.map(salario => ({
+      mes_ano: salario.mes_ano,
+      salario_atualizado: new Big(salario.salario_atualizado).toFixed(2),
+    }));
+
+    const somaSalariosAtualizados = salarioAtualizadoEntries.reduce((acc, salario) => acc.plus(new Big(salario.salario_atualizado)), new Big(0));
+
     const valorBeneficio = somaSalariosAtualizados.times(0.60).toFixed(2);
 
     return valorBeneficio;
@@ -241,7 +227,6 @@ async function calcularValorBeneficio(simulacaoId) {
   }
 }
 
-// Rota POST para processar os dados do formulário de simulação
 router.post('/', async (req, res) => {
   try {
     const { campoAnoMes, campoSalario, dataNascimento, genero } = req.body;
@@ -254,8 +239,8 @@ router.post('/', async (req, res) => {
     const { periodoContribuicaoMinimo, idadeAposentadoria } = calcularRequisitosAposentadoria(genero);
     const { tempoContribuicaoMes, tempoContribuicaoPendente } = calcularTempoContribuicao(campoAnoMes, periodoContribuicaoMinimo);
 
-    const mesAposentadoria = calcularMesAposentadoria(idadeAtual, genero);
-    const anoAposentadoria = calcularAnoAposentadoria(idadeAtual, genero);
+    const mesAposentadoria = calcularMesAposentadoria(idadeAtual, idadeAposentadoria);
+    const anoAposentadoria = calcularAnoAposentadoria(idadeAtual, idadeAposentadoria);
 
     const simulacao = await prisma.simulacao_beneficio.create({
       data: {
@@ -263,36 +248,22 @@ router.post('/', async (req, res) => {
         data_nascimento: new Date(dataNascimento),
         idade: idadeAtual,
         tempo_contribuicao_mes: tempoContribuicaoMes,
-        tempo_contribuicao_pendente: tempoContribuicaoPendente,
         idade_aposentadoria: idadeAposentadoria,
         mes_aposentadoria: mesAposentadoria,
-        anoAposentadoria,
-        valor_beneficio: NaN,
-        salario_atualizado: {
-          create: campoAnoMes.map((mesAno, index) => ({
-            mes_ano: mesAno,
-            salario_atualizado: 0,
-          })),
-        },
+        ano_aposentadoria: anoAposentadoria,
+        tempo_contribuicao_pendente,
       },
     });
 
     const simulacaoId = simulacao.id;
 
-    const salariosAtualizados = await criarSalarioAtualizadoEntries(simulacaoId, campoAnoMes, campoSalario);
-
-    console.log("salarioatualizado", salariosAtualizados);
+    const salarioAtualizadoEntries = await criarSalarioAtualizadoEntries(simulacaoId, campoAnoMes, campoSalario);
 
     await prisma.salario_atualizado.createMany({
-      data: salariosAtualizados,
+      data: salarioAtualizadoEntries,
     });
 
     const valorBeneficio = await calcularValorBeneficio(simulacaoId);
-
-    await prisma.simulacao_beneficio.update({
-      where: { id: simulacaoId },
-      data: { valor_beneficio: valorBeneficio },
-    });
 
     const result = {
       success: true,
@@ -317,3 +288,4 @@ router.post('/', async (req, res) => {
 });
 
 export default router;
+

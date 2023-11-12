@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS `simulacao_beneficio` (
   `mes_aposentadoria` INT NULL,
   `anoAposentadoria` INT NULL,
   `tempo_contribuicao_pendente` INT NULL,
-   simulacao_beneficio_id INT,
+  `simulacao_beneficio_id` INT,
   `valor_beneficio` DECIMAL(10,2) NULL,
   PRIMARY KEY (`id`))
 ENGINE = InnoDB;
