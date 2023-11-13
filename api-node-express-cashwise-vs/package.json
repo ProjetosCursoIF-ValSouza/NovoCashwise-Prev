@@ -1,5 +1,5 @@
 {
-  "name": "api-node-express-2sem2023",
+  "name": "api-cashwise-express-2sem2023",
   "version": "1.0.0",
   "description": "Api do nosso projeto CashWise. Feito com express seguindo o modelo MVC com programação modular.",
   "main": "src/server.js",
@@ -8,10 +8,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/renancavichi/api-node-express-2sem2023.git"
-  },
+  
   "keywords": [
     "api",
     "node",
