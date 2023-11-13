@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import axios from 'axios';
 import Header from '../layout/Header';
+import Footer from '../layout/Footer';
 import Blockquote from '../layout/Blockquote';
 import { Container, Row, Col, Form, Button } from 'react-bootstrap';
 import './Simule.css';
@@ -132,6 +133,7 @@ function SimulePage() {
           </Col>
         </Row>
       </Container>
+      <Footer />
     </div>
   );
 }
@@ -190,5 +192,6 @@ DataNascimentoInput.propTypes = {
   dataNascimento: PropTypes.string.isRequired,
   handleDataNascimentoChange: PropTypes.func.isRequired,
 };
+
 
 export default SimulePage;
