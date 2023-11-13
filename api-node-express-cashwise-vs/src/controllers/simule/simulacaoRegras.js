@@ -6,8 +6,27 @@ const prisma = new PrismaClient();
 
 const router = express.Router();
 
-async function obterDadosAtualizacaoMonetaria(mesAno) {
+// Função de middleware para tratamento de erros
+function errorHandler(err, req, res, next) {
+  console.error(err);
+  res.status(500).json({ success: false, message: 'Ocorreu um erro', error: err.message });
+}
+
+// Tratar erros em funções assíncronas
+async function handleAsyncError(fn) {
   try {
+    return await fn();
+  } catch (error) {
+    console.error('Erro:', error);
+    throw new Error('Erro ao processar');
+  }
+}
+
+// Adicionar ao final das minhas rotas
+router.use(errorHandler);
+
+async function obterDadosAtualizacaoMonetaria(mesAno) {
+  return await handleAsyncError(async () => {
     const parts = mesAno.split('/');
     if (parts.length === 2) {
       const newDate = parts[1] + '-' + parts[0];
@@ -29,14 +48,11 @@ async function obterDadosAtualizacaoMonetaria(mesAno) {
     } else {
       throw new Error(`Formato de mês/ano inválido: ${mesAno}`);
     }
-  } catch (error) {
-    console.error(error);
-    return 1;
-  }
+  });
 }
 
 async function criarSalarioAtualizadoEntries(simulacaoId, campoAnoMes, campoSalario) {
-  try {
+  return await handleAsyncError(async () => {
     const simulacao = await prisma.simulacao_beneficio.findUnique({
       where: { id: simulacaoId },
     });
@@ -65,14 +81,11 @@ async function criarSalarioAtualizadoEntries(simulacaoId, campoAnoMes, campoSala
     }));
 
     return salarioAtualizadoEntries.filter(entry => entry !== null);
-  } catch (error) {
-    console.error(error);
-    throw new Error('Erro ao criar entradas para salario_atualizado');
-  }
+  });
 }
 
 async function calcularSalarioAtualizado(simulacaoId, mesAno, arrCampoAnoMes, arrCampoSalario) {
-  try {
+  return await handleAsyncError(async () => {
     const simulacao = await prisma.simulacao_beneficio.findUnique({
       where: { id: simulacaoId },
     });
@@ -127,10 +140,7 @@ async function calcularSalarioAtualizado(simulacaoId, mesAno, arrCampoAnoMes, ar
     }
 
     return salarioAtualizado;
-  } catch (error) {
-    console.error(error);
-    throw new Error('Erro ao calcular o salário atualizado');
-  }
+  });
 }
 
 function calcularIdade(dataNascimento) {
@@ -146,10 +156,15 @@ function calcularIdade(dataNascimento) {
 }
 
 function calcularRequisitosAposentadoria(genero) {
-  return {
-    Masculino: { periodoContribuicaoMinimo: 240, idadeAposentadoria: 65 },
-    Feminino: { periodoContribuicaoMinimo: 180, idadeAposentadoria: 62 },
-  }[genero] || { periodoContribuicaoMinimo: 0, idadeAposentadoria: 0 };
+  const MASCULINO = 'Masculino';
+  const FEMININO = 'Feminino';
+
+  const requisitos = {
+    [MASCULINO]: { periodoContribuicaoMinimo: 240, idadeAposentadoria: 65 },
+    [FEMININO]: { periodoContribuicaoMinimo: 180, idadeAposentadoria: 62 },
+  };
+
+  return requisitos[genero] || { periodoContribuicaoMinimo: 0, idadeAposentadoria: 0 };
 }
 
 function calcularAposentadoria(idade, genero) {
@@ -181,19 +196,25 @@ function calcularMesAposentadoria(dataNascimento, genero) {
 function calcularAnoAposentadoria(dataNascimento, genero) {
   const { anoAposentadoria } = calcularAposentadoria(dataNascimento, genero);
   return anoAposentadoria;
+
 }
 
 function calcularTempoContribuicao(arrCampoAnoMes, periodoContribuicaoMinimo) {
-  const tempoContribuicaoMes = arrCampoAnoMes.length;
-  const tempoContribuicaoPendente = Math.max(0, periodoContribuicaoMinimo - tempoContribuicaoMes);
+  try {
+    const tempoContribuicaoMes = arrCampoAnoMes.length;
+    const tempoContribuicaoPendente = Math.max(0, periodoContribuicaoMinimo - tempoContribuicaoMes);
 
-  const result = { tempoContribuicaoMes, tempoContribuicaoPendente };
-  
-  return result;
+    return { tempoContribuicaoMes, tempoContribuicaoPendente };
+  } catch (error) {
+    console.error(error);
+    // Retorne um objeto padrão em caso de erro
+    return { tempoContribuicaoMes: 0, tempoContribuicaoPendente: 0 };
+  }
 }
 
+
 async function calcularValorBeneficio(simulacaoId) {
-  try {
+  return await handleAsyncError(async () => {
     const simulacaoBeneficio = await prisma.simulacao_beneficio.findUnique({
       where: { id: simulacaoId },
       include: {
@@ -221,13 +242,11 @@ async function calcularValorBeneficio(simulacaoId) {
     const valorBeneficio = somaSalariosAtualizados.times(0.60).toFixed(2);
 
     return valorBeneficio;
-  } catch (error) {
-    console.error(error);
-    throw new Error('Erro ao calcular o valor do benefício');
-  }
+  });
 }
 
 router.post('/', async (req, res) => {
+  let tempoContribuicaoPendente;
   try {
     const { campoAnoMes, campoSalario, dataNascimento, genero } = req.body;
 
@@ -237,10 +256,11 @@ router.post('/', async (req, res) => {
 
     const idadeAtual = calcularIdade(dataNascimento);
     const { periodoContribuicaoMinimo, idadeAposentadoria } = calcularRequisitosAposentadoria(genero);
-    const { tempoContribuicaoMes, tempoContribuicaoPendente } = calcularTempoContribuicao(campoAnoMes, periodoContribuicaoMinimo);
+    const { tempoContribuicaoMes } = calcularTempoContribuicao(campoAnoMes, periodoContribuicaoMinimo);
+    tempoContribuicaoPendente = calcularTempoContribuicao(campoAnoMes, periodoContribuicaoMinimo).tempoContribuicaoPendente;
 
-    const mesAposentadoria = calcularMesAposentadoria(idadeAtual, idadeAposentadoria);
-    const anoAposentadoria = calcularAnoAposentadoria(idadeAtual, idadeAposentadoria);
+    const mesAposentadoria = calcularMesAposentadoria(idadeAtual, genero);
+    const anoAposentadoria = calcularAnoAposentadoria(idadeAtual, genero);
 
     const simulacao = await prisma.simulacao_beneficio.create({
       data: {
@@ -250,8 +270,8 @@ router.post('/', async (req, res) => {
         tempo_contribuicao_mes: tempoContribuicaoMes,
         idade_aposentadoria: idadeAposentadoria,
         mes_aposentadoria: mesAposentadoria,
-        ano_aposentadoria: anoAposentadoria,
-        tempo_contribuicao_pendente,
+        anoAposentadoria,
+        tempo_contribuicao_pendente: tempoContribuicaoPendente,
       },
     });
 
@@ -288,4 +308,3 @@ router.post('/', async (req, res) => {
 });
 
 export default router;
-
