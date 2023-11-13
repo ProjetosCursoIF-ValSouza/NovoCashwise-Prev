@@ -24,7 +24,7 @@ USE api_web;
 -- -----------------------------------------------------
 -- Table `api_web`.`simulacao_beneficio`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `simulacao_beneficio` (
+CREATE TABLE `simulacao_beneficio` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `genero` ENUM('m', 'f') NOT NULL,
   `data_nascimento` DATE NOT NULL,
@@ -43,7 +43,7 @@ ENGINE = InnoDB;
 -- -----------------------------------------------------
 -- Table `api_web`.`simulacao_periodo_trabalho`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `simulacao_periodo_trabalho` (
+CREATE TABLE `simulacao_periodo_trabalho` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `mes` INT NOT NULL,
   `ano` INT NOT NULL,
@@ -63,10 +63,11 @@ CREATE TABLE IF NOT EXISTS `simulacao_periodo_trabalho` (
 -- Table `api_web`.`salario_atualizado`
 -- -----------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS salario_atualizado (
+CREATE TABLE salario_atualizado (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,
   mes_ano VARCHAR(7) NOT NULL,
   salario_atualizado DECIMAL(10,2) NOT NULL,
+  simulacao_beneficio_id INT UNSIGNED NOT NULL,
   PRIMARY KEY (id)
 ) ENGINE = InnoDB;
 
